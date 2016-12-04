@@ -1,0 +1,48 @@
+- hosts: all
+  become: true
+  tasks:
+
+    - name: set timezone to {{ timezone }}
+      timezone: name={{ timezone }} # comes from group_vars/all
+      tags: tz
+
+    - name: set keyboard layout to {{ keyboard_layout }}
+      lineinfile:
+        dest: /etc/default/keyboard
+        regexp: '^XKBLAYOUT=.*$'
+        line: 'XKBLAYOUT="{{ keyboard_layout }}"'
+      register: keyboard_layout_result
+      tags: kb
+
+    - name: activate keyboard layout
+      shell: "dpkg-reconfigure -f noninteractive keyboard-configuration"
+      when: keyboard_layout_result.changed
+      tags: kb
+
+    - name: Update profile
+      template:
+        src: ./templates/profile.j2
+        dest: /etc/profile.d/my_profile.sh
+        owner: root
+        group: root
+        mode: 0644
+      tags: profile
+
+    - name: Install updates
+      apt:
+        upgrade: yes
+        cache_valid_time: 3600
+
+    - name: Install essential packages
+      apt:
+        pkg: "{{ item }}"
+        state: latest 
+      with_items:
+        - git
+        - rpi-update
+        - vim
+      tags: pkgs
+
+    - name: run rpi-update
+      shell: rpi-update
+      tags: rpi-update
